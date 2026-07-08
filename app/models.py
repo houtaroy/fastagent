@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from ag_ui.core import Message
 from sqlalchemy import TIMESTAMP, Column, ForeignKey, Index, Integer, String, Text, text
 from sqlmodel import Field, SQLModel
 
@@ -58,6 +59,6 @@ class ChatCreate(SQLModel):
 
 
 class AgentMessagesPublic(SQLModel):
-    messages: list[AgentMessages]
+    messages: list[Message]
     next_cursor: int | None
     has_more: bool

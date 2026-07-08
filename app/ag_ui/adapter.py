@@ -1,9 +1,16 @@
-from collections.abc import AsyncIterable, AsyncIterator, Iterator
+import json
+from collections.abc import AsyncIterable, AsyncIterator, Iterable, Iterator
+from typing import cast
 from uuid import uuid4
 
 from ag_ui.core import (
+    AssistantMessage,
+    DeveloperMessage,
     Event,
+    FunctionCall,
+    Message,
     ReasoningEndEvent,
+    ReasoningMessage,
     ReasoningMessageContentEvent,
     ReasoningMessageEndEvent,
     ReasoningMessageStartEvent,
@@ -13,10 +20,13 @@ from ag_ui.core import (
     TextMessageContentEvent,
     TextMessageEndEvent,
     TextMessageStartEvent,
+    ToolCall,
     ToolCallArgsEvent,
     ToolCallEndEvent,
     ToolCallResultEvent,
     ToolCallStartEvent,
+    ToolMessage,
+    UserMessage,
 )
 from agents import (
     RawResponsesStreamEvent,
@@ -25,16 +35,166 @@ from agents import (
     ToolCallOutputItem,
 )
 from openai.types.responses import (
+    EasyInputMessageParam,
     ResponseFunctionCallArgumentsDeltaEvent,
     ResponseFunctionToolCall,
+    ResponseFunctionToolCallParam,
+    ResponseInputItemParam,
     ResponseOutputItemAddedEvent,
     ResponseOutputItemDoneEvent,
     ResponseOutputMessage,
+    ResponseOutputMessageParam,
     ResponseReasoningItem,
+    ResponseReasoningItemParam,
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseStreamEvent,
     ResponseTextDeltaEvent,
 )
+from openai.types.responses.response_input_item_param import (
+    FunctionCallOutput,
+)
+
+from app.models import AgentMessages
+
+
+def to_ag_ui_messages(messages: Iterable[AgentMessages]) -> list[Message]:
+    return [
+        ag_ui_message
+        for message in messages
+        if (ag_ui_message := to_ag_ui_message(message)) is not None
+    ]
+
+
+def to_ag_ui_message(message: AgentMessages) -> Message | None:
+    input_item: ResponseInputItemParam = json.loads(message.message_data)
+    if "type" in input_item:
+        return _type_input_item_to_ag_ui_message(input_item, message)
+    else:
+        return _to_ag_ui_user_message(cast(EasyInputMessageParam, input_item), message)
+
+
+def _type_input_item_to_ag_ui_message(
+    input_item: ResponseInputItemParam,
+    message: AgentMessages,
+) -> Message | None:
+    match input_item["type"]:
+        case "reasoning":
+            return _to_ag_ui_reasoning_message(
+                cast(ResponseReasoningItemParam, input_item),  # type: ignore[redundant-cast]
+                message,
+            )
+        case "function_call":
+            return _to_ag_ui_function_call_message(
+                cast(ResponseFunctionToolCallParam, input_item),  # type: ignore[redundant-cast]
+                message,
+            )
+        case "function_call_output":
+            return _to_ag_ui_function_call_output_message(
+                cast(FunctionCallOutput, input_item),  # type: ignore[redundant-cast]
+                message,
+            )
+        case "message":
+            return _role_input_item_to_ag_ui_message(
+                cast(EasyInputMessageParam, input_item),
+                message,
+            )
+        case _:
+            return None
+
+
+def _role_input_item_to_ag_ui_message(
+    input_item: EasyInputMessageParam,
+    message: AgentMessages,
+) -> Message | None:
+    match input_item["role"]:
+        case "assistant":
+            return _to_ag_ui_assistant_message(
+                cast(ResponseOutputMessageParam, input_item),
+                message,
+            )
+        case "developer":
+            return _to_ag_ui_developer_message(input_item, message)
+        case _:
+            return None
+
+
+def _to_ag_ui_reasoning_message(
+    item: ResponseReasoningItemParam,
+    message: AgentMessages,
+) -> ReasoningMessage:
+    return ReasoningMessage(
+        id=str(message.id),
+        content="".join(summary["text"] for summary in item["summary"]),
+    )
+
+
+def _to_ag_ui_function_call_message(
+    item: ResponseFunctionToolCallParam,
+    message: AgentMessages,
+) -> AssistantMessage:
+    return AssistantMessage(
+        id=str(message.id),
+        tool_calls=[
+            ToolCall(
+                id=item["call_id"],
+                function=FunctionCall(
+                    name=item["name"],
+                    arguments=item["arguments"],
+                ),
+            )
+        ],
+    )
+
+
+def _to_ag_ui_function_call_output_message(
+    item: FunctionCallOutput,
+    message: AgentMessages,
+) -> ToolMessage | None:
+    if not isinstance(item["output"], str):
+        return None
+
+    return ToolMessage(
+        id=str(message.id),
+        content=item["output"],
+        tool_call_id=item["call_id"],
+    )
+
+
+def _to_ag_ui_developer_message(
+    item: EasyInputMessageParam,
+    message: AgentMessages,
+) -> DeveloperMessage | None:
+    if not isinstance(item["content"], str):
+        return None
+
+    return DeveloperMessage(id=str(message.id), content=item["content"])
+
+
+def _to_ag_ui_user_message(
+    item: EasyInputMessageParam,
+    message: AgentMessages,
+) -> UserMessage | None:
+    content = item["content"]
+    if not isinstance(content, str):
+        return None
+
+    return UserMessage(id=str(message.id), content=content)
+
+
+def _to_ag_ui_assistant_message(
+    item: ResponseOutputMessageParam,
+    message: AgentMessages,
+) -> AssistantMessage:
+    return AssistantMessage(
+        id=str(message.id),
+        content="".join(
+            [
+                content["text"]
+                for content in item["content"]
+                if content["type"] == "output_text"
+            ]
+        ),
+    )
 
 
 async def to_ag_ui_stream(
