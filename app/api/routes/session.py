@@ -43,13 +43,13 @@ async def get_messages(
 @router.post("/{id}/chat", response_class=EventSourceResponse)
 async def chat(
     id: str,
-    body: ChatCreate,
+    chat_in: ChatCreate,
     agent: AgentDep,
 ) -> AsyncIterable[ServerSentEvent]:
 
     stream = Runner.run_streamed(
         starting_agent=agent,
-        input=body.content,
+        input=chat_in.content,
         session=SQLAlchemySession(session_id=id, engine=async_engine),
     )
 
