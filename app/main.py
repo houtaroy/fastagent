@@ -29,7 +29,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     agent = Agent(
         name=settings.AGENT_NAME,
         model=settings.AGENT_MODEL,
-        model_settings=ModelSettings(reasoning=Reasoning(effort="none")),
+        model_settings=ModelSettings(
+            reasoning=Reasoning(effort=settings.AGENT_MODEL_REASONING)
+        ),
         tools=[get_weather],
     )
     app.state.agent = agent
