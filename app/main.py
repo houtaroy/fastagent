@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from openai import AsyncOpenAI
 from openai.types import Reasoning
 
-from app.agent.tool import get_weather
+from app.agent.tools import get_weather
 from app.api.main import api_router
 from app.core.config import settings
 from app.core.db import init_db
