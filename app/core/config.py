@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     AGENT_NAME: str = ""
     AGENT_MODEL: str = ""
     AGENT_MODEL_REASONING: ReasoningEffort = "none"
-    # AGENT_PROMPT_FILE: str = "prompts/developer.md"
+    AGENT_INSTRUCTIONS_FILE: str = "instructions.md"
     # AGENT_CONTEXT_WINDOW: int = 10
 
 

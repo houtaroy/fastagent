@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from openai import AsyncOpenAI
 from openai.types import Reasoning
 
+from app.agent.instructions import InstructionsLoader
 from app.agent.tools import get_weather
 from app.api.main import api_router
 from app.core.config import settings
@@ -26,12 +27,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     set_default_openai_client(async_openai, use_for_tracing=False)
     set_tracing_disabled(not settings.OPENAI_TRACING)
+    instructions_loader = InstructionsLoader(path=settings.AGENT_INSTRUCTIONS_FILE)
     agent = Agent(
         name=settings.AGENT_NAME,
         model=settings.AGENT_MODEL,
         model_settings=ModelSettings(
             reasoning=Reasoning(effort=settings.AGENT_MODEL_REASONING)
         ),
+        instructions=instructions_loader.load,
         tools=[get_weather],
     )
     app.state.agent = agent
