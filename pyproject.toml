@@ -8,7 +8,7 @@ dependencies = [
     "ag-ui-protocol>=0.1.19",
     "asyncpg>=0.31.0",
     "fastapi[standard]>=0.139.0",
-    "openai-agents>=0.17.7",
+    "openai-agents>=0.18.3",
     "sqlmodel>=0.0.39",
 ]
 

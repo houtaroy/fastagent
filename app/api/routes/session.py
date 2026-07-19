@@ -1,11 +1,11 @@
 from collections.abc import AsyncIterable
 
 from agents import Runner
+from agents.extensions.memory import SQLAlchemySession
 from fastapi import APIRouter, Query
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from app.ag_ui.adapter import to_ag_ui_messages, to_ag_ui_stream
-from app.agent.session import SQLAlchemySession
 from app.api.deps import AgentDep, AsyncSessionDep
 from app.core.db import async_engine
 from app.crud import get_agent_messages
@@ -50,7 +50,11 @@ async def chat(
     stream = Runner.run_streamed(
         starting_agent=agent,
         input=chat_in.content,
-        session=SQLAlchemySession(session_id=id, engine=async_engine),
+        session=SQLAlchemySession(
+            session_id=id,
+            engine=async_engine,
+            ensure_ascii=False,
+        ),
     )
 
     async for event in to_ag_ui_stream(id, stream.stream_events()):
